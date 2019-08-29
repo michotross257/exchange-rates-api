@@ -63,9 +63,9 @@ def get_insert_statement_and_values(response, date):
     Returns:
         tuple: INSERT statement (str) and the associated values (tuple)
     '''
-    statement = 'INSERT INTO {} VALUES (?,?,'.format(TABLE_NAME) + '?,'*(len(response['rates'])-1)
+    statement = 'INSERT INTO {} VALUES (?,?,'.format(TABLE_NAME) + '?,'*(len(rate_keys)-1)
     statement += '?)'
-    values = tuple([date, response['base']] + [response['rates'][x] for x in rate_keys])
+    values = tuple([date, response['base']] + [1.0 if x == args.base else response['rates'][x] for x in rate_keys])
     return (statement, values)
 
 
@@ -98,10 +98,14 @@ else:
 current_date = start_date
 # end date
 if isinstance(args.end, str):
-    year, month, day = args.start.split('-')
+    year, month, day = args.end.split('-')
     today_date = datetime.datetime(year=int(year), month=int(month), day=int(day)).date()
 else:
     today_date = args.end
+# ensure start date < end date
+msg = 'Start date "{}" must be before the end date "{}".'.format(start_date.strftime('%Y-%m-%d'),
+                                                                 today_date.strftime('%Y-%m-%d'))
+assert start_date < today_date, msg
 
 days = [
     'Monday',
@@ -120,6 +124,8 @@ isoweekdays = dict(zip(range(1,8), days))
 response = get_api_response(current_date)
 # the country IDs
 rate_keys = list(response['rates'].keys())
+if args.base not in rate_keys:
+    rate_keys.append(args.base)
 # the full list of table column names
 table_keys = ['date', 'base'] + rate_keys
 
@@ -134,9 +140,10 @@ assert not len(set_diff), msg
 create_table_statement = 'CREATE TABLE IF NOT EXISTS {} ('.format(TABLE_NAME)
 create_table_statement += '\n\tdate text PRIMARY KEY,\n\tbase text,'
 for cnt, value in enumerate(rate_keys):
-    comma = '' if cnt == len(response['rates'])-1 else ','
+    comma = '' if cnt == len(rate_keys)-1 else ','
     create_table_statement = create_table_statement + '\n\t{} real{}'.format(value, comma)
 create_table_statement += '\n)'
+print(create_table_statement)
 
 # create the database and connect to it
 with sqlite3.connect('exchange_rate.db') as conn:
@@ -165,12 +172,27 @@ with sqlite3.connect('exchange_rate.db') as conn:
     # ====================
     if args.plot:
         if not table_exists:
-            msg = 'The table "{}" is not populated. Include the -p flag to populate the table before plotting.'.format(TABLE_NAME)
+            msg = 'The table "{}" is not populated. Include the -r flag to populate the table before plotting.'.format(TABLE_NAME)
             raise Exception(msg)
+        c.execute('SELECT date FROM {};'.format(TABLE_NAME))
+        dates_in_table = c.fetchall()
+        # if the provided dates are not in the table
+        for dt in [('Start Date', start_date.strftime('%Y-%m-%d')),
+                   ('End Date', today_date.strftime('%Y-%m-%d'))]:
+            if (dt[1],) not in dates_in_table:
+                msg = 'The {} "{}" is not in the table "{}". Include the -r flag to populate the table with the date range.'.format(dt[0],
+                                                                                                                                    dt[1],
+                                                                                                                                    TABLE_NAME)
+                raise Exception(msg)
         if args.base not in countries:
             countries.append(args.base)
+        # difference in days between today and start date
+        time_diff = today_date - start_date
+        # get the dates from start to today
+        dates = [(start_date + datetime.timedelta(x)) for x in range(0, time_diff.days+1)]
         select_statement = 'SELECT ' + '{},'*len(countries)
-        select_statement = select_statement.rstrip(',').format(*countries) + '\nFROM {};'.format(TABLE_NAME)
+        select_statement = select_statement.rstrip(',').format(*countries) + '\nFROM {}'.format(TABLE_NAME)
+        select_statement += '\nWHERE date IN {};'.format(tuple([d.strftime('%Y-%m-%d') for d in dates]))
         c.execute(select_statement)
         data = c.fetchall()
         # isolate rates
@@ -178,18 +200,18 @@ with sqlite3.connect('exchange_rate.db') as conn:
         for index, country in enumerate(countries):
             rates[country] = [x[index] for x in data]
 
+        # the number of bins on the x-axis of the plot
+        num_bins = 8 if len(dates) >= 8 else len(dates)
+        indexes = np.linspace(0, len(dates)-1, num_bins).astype(int)
         # get the xticklabels (i.e. dates)
-        # difference in days between today and start date
-        time_diff = today_date - start_date
-        # get the dates from start to today
-        dates = [(start_date + datetime.timedelta(x)) for x in range(1, time_diff.days+1)]
-        indexes = np.linspace(0, len(dates)-1, 8).astype(int)
         xticklabels = [dates[index] for index in indexes]
 
         # graph the data
         fig, ax = plt.subplots(figsize=(16,6))
         for r in rates:
             plt.plot(rates[r], label=r)
+        xmin, xmax = ax.get_xlim()
+        ax.set_xticks(np.round(np.linspace(0, xmax+xmin, num_bins), 2))
         ax.set_xticklabels(xticklabels)
         plt.xlabel('Date', fontsize=12)
         plt.ylabel('Exchange Rate', fontsize=12)

@@ -21,8 +21,8 @@ Data from: https://exchangeratesapi.io
 `$ python ExchangeRateAPI.py -r -b CAD`
 #### Populate table from 2019-01-01 to 2019-02-01
 `$ python ExchangeRateAPI.py -r -s 2019-01-01 -e 2019-02-01`
-#### Plot CAD, MXN, BGN against base currency of EUR from 2019-01-01 to Today
-`$ python ExchangeRateAPI.py -r -p -b EUR -s 2019-02-01 -c CAD,MXN,BGN`
+#### Plot CAD, MXN, BGN against base currency of EUR from 2019-01-01 to Today WITHOUT repopulating the table
+`$ python ExchangeRateAPI.py -p -b EUR -s 2019-02-01 -c CAD,MXN,BGN`
 > NOTE: If you try to plot a date(s) not in the table without the -r flag, then an exception will be raised.
-#### Populate the table where USD is the base currency using the default date range, plot USD vs CAD, then allow the update feature to run indefinitely
+#### Populate the table using default currency (USD) using the default date range (2019-05-01 to Today), plot USD vs CAD, then allow the update feature to run indefinitely
 `$ python ExchangeRateAPI.py -r -p -u`

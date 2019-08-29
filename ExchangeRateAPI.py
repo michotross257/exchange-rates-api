@@ -223,7 +223,7 @@ with sqlite3.connect('exchange_rate.db') as conn:
         plt.show()
     
     if args.update:
-        _ = input("Press any key to continue.")
+        _ = input("Press [ENTER] to continue.")
         print('Daily update has begun.\nNote: This update will run indefinitely unless killed.')
         # loop to run indefinitely to gather daily update
         # determine the next day. When it arrives, we need to call the API

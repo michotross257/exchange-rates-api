@@ -8,10 +8,15 @@ Data from: https://exchangeratesapi.io
 I decided to query for each date individually because querying a date range was resulting in ambiguous
 results for the values of holidays. Querying individual days forces the API to tell you what the correct
 values are for that day.
+
+## Comparative Plot of Exchange Rates
+
+![alt text](https://raw.githubusercontent.com/michotross257/ExchangeRateAPI/master/ExchangeRateComparisonPlot.png)
+
 ## Usage
 **FLAGS** (one or more must be chosen for any behavior):
 
-	1. Populate the table: -r 
+	1. Populate the table: -r
 	2. Comparative plot: -p
 	3. Update table each day indefinitely: -u
 

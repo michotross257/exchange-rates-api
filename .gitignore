@@ -3,4 +3,5 @@
 
 # Except for:
 !.gitignore
+!.README
 !ExchangeRateAPI.py

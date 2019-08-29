@@ -143,7 +143,6 @@ for cnt, value in enumerate(rate_keys):
     comma = '' if cnt == len(rate_keys)-1 else ','
     create_table_statement = create_table_statement + '\n\t{} real{}'.format(value, comma)
 create_table_statement += '\n)'
-print(create_table_statement)
 
 # create the database and connect to it
 with sqlite3.connect('exchange_rate.db') as conn:
@@ -223,8 +222,9 @@ with sqlite3.connect('exchange_rate.db') as conn:
         plt.legend()
         plt.show()
     
-    
     if args.update:
+        _ = input("Press any key to continue.")
+        print('Daily update has begun.\nNote: This update will run indefinitely unless killed.')
         # loop to run indefinitely to gather daily update
         # determine the next day. When it arrives, we need to call the API
         next_day = today_date + datetime.timedelta(1)

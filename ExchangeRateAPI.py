@@ -16,8 +16,8 @@ parser.add_argument('-e', '--end', default=datetime.datetime.now().date(), metav
                     help="End date of exchange rates history query. Form of date should be YYYY-MM-DD (default: Today's date).")
 parser.add_argument('-c', '--countries', default='USD,CAD', metavar='',
                     help='Comma separated list of countries to include the comparative exchange plot (Default: USD,CAD).')
-parser.add_argument('-r', '--repopulate', action='store_true',
-                    help='Whether to repopulate the table from the start date up to and including the end date.')
+parser.add_argument('-r', '--populate', action='store_true',
+                    help='Whether to populate the table from the start date up to and including the end date.')
 parser.add_argument('-p', '--plot', action='store_true',
                     help='Whether to include a plot of comparative exchange rates.')
 parser.add_argument('-u', '--update', action='store_true',
@@ -154,7 +154,7 @@ with sqlite3.connect('exchange_rate.db') as conn:
     c.execute('SELECT name FROM sqlite_master WHERE name="{}"'.format(TABLE_NAME))
     table_exists = len(c.fetchall())
     
-    if args.repopulate:
+    if args.populate:
         # create the table (if it doesn't exist)
         c.execute(create_table_statement)
         # accumulate all of the data from start date up to and including today

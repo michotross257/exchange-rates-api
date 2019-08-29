@@ -4,10 +4,14 @@ Author: Michael Trossbach
 Contact: mptrossbach@gmail.com
 
 Data from: https://exchangeratesapi.io
+
+I decided to query for each date individually because querying a date range was resulting in ambiguous
+results for the values of holidays. Querying individual days forces the API to tell you what the correct
+values are for that day.
 ## Usage
 **FLAGS** (one or more must be chosen for any behavior):
 
-	1. Repopulate the table: -r 
+	1. Populate the table: -r 
 	2. Comparative plot: -p
 	3. Update table each day indefinitely: -u
 
@@ -15,7 +19,7 @@ Data from: https://exchangeratesapi.io
 
 ### Example Scenarios
 
-#### Populate (& repopulate) table from start date up to and including end date
+#### Populate (or repopulate) table from start date up to and including end date
 `$ python ExchangeRateAPI.py -r`
 #### Populate table using new base currency of CAD
 `$ python ExchangeRateAPI.py -r -b CAD`

@@ -153,6 +153,9 @@ with sqlite3.connect('exchange_rate.db') as conn:
     c.execute('SELECT name FROM sqlite_master WHERE name="{}"'.format(TABLE_NAME))
     table_exists = len(c.fetchall())
     
+    # =========================   
+    # POPULATE/REPOPULATE TABLE
+    # =========================
     if args.populate:
         # create the table (if it doesn't exist)
         c.execute(create_table_statement)
@@ -222,6 +225,9 @@ with sqlite3.connect('exchange_rate.db') as conn:
         plt.legend()
         plt.show()
     
+    # ==================   
+    # DAILY TABLE UPDATE
+    # ==================
     if args.update:
         _ = input("Press [ENTER] to continue.")
         print('Daily update has begun.\nNote: This update will run indefinitely unless killed.')

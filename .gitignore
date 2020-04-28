@@ -4,5 +4,5 @@
 # Except for:
 !.gitignore
 !README.md
-!ExchangeRateAPI.py
+!ExchangeRatesAPI.py
 !ExchangeRateComparisonPlot.png

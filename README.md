@@ -11,7 +11,7 @@ values are for that day.
 
 ## Comparative Plot of Exchange Rates
 
-![alt text](https://raw.githubusercontent.com/michotross257/ExchangeRatesAPI/master/ExchangeRateComparisonPlot.png)
+![alt text](https://raw.githubusercontent.com/michotross257/exchange-rates-api/master/ExchangeRateComparisonPlot.png)
 
 ## Usage
 **FLAGS** (one or more must be chosen for any behavior):

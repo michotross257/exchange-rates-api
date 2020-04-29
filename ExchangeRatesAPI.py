@@ -93,11 +93,12 @@ def get_insert_statement_and_values(rsp, date, table_name, rate_keys, base_rate)
     return statement, values
 
 
-def insert_into_table(cursor, statement, values):
+def insert_into_table(connection, cursor, statement, values):
     """
-    Insert the values into the table.
+    Insert the values into the table then commit insert.
 
     Args:
+        connection(sqlite3.connect()): connection to database
         cursor(sqlite3.connect().cursor()): cursor connected to database
         statement(str): INSERT statement to be committed
         values(tuple): Values to be included in INSERT statement
@@ -109,23 +110,7 @@ def insert_into_table(cursor, statement, values):
         cursor.execute(statement, values)
     except sqlite3.IntegrityError:
         pass
-
-
-def validate_date(dt, date_label, valid_dates, table_name):
-    """
-    Check to make sure given date exists in table.
-
-    Args:
-        dt(str): string representation ('YYYY-MM-DD') of start or end date
-        date_label(str): label associated with dt ('start'|'end')
-        valid_dates(list): list of dates that exist in table
-        table_name(str): name of table
-
-    Returns:
-        None
-    """
-    msg = "The {} date '{}' is not in the table '{}'. Include the -p flag to populate the table with the date range."
-    assert dt in valid_dates, msg.format(date_label, dt, table_name)
+    connection.commit()
 
 
 def visualize_exchange_rates(rates, base_rate, dates):
@@ -161,6 +146,26 @@ def visualize_exchange_rates(rates, base_rate, dates):
     plt.title(title, fontsize=18)
     plt.legend()
     plt.show()
+
+
+def warn_about_base_currency(behavior, arg_base, table_base):
+    """
+    Warns that the base command line base currency arg does not match the base
+    currency in the table. The base currency in the table will be used.
+
+    Args:
+        behavior(str): alias/label for behavior - 'Update'|'Visualization'
+        arg_base(str): the base currency provided via command line
+        table_base(str): the current base currency in table
+
+    Returns:
+        None
+    """
+    msg = '{}Warning:\n'
+    msg += 'Base currency to be used - {} - does not match base currency in table - {}. '
+    msg += 'Current table currency will be used. '
+    msg += 'Include the -p flag to populate the table using new base currency.'
+    warnings.warn(msg.format(behavior, arg_base, table_base))
 
 
 if __name__ == '__main__':
@@ -199,6 +204,7 @@ if __name__ == '__main__':
     # request data from the API to get the country IDs
     response = get_api_response(start_date)
     rate_keys = list(response['rates'].keys())
+    # NOTE: args.base will be validated in API call so we don't need to do that
     # the full list of table column names
     table_keys = ['date', 'base'] + rate_keys
 
@@ -220,54 +226,76 @@ if __name__ == '__main__':
     # create the database and connect to it
     with sqlite3.connect('exchange_rates.db') as conn:
         cur = conn.cursor()
-        # check to see if table exists for plotting in case the user does not choose to repopulate
-        # the table but chooses to plot, in which case, raise an exception
-        cur.execute('SELECT name FROM sqlite_master WHERE name="{}"'.format(TABLE_NAME))
-        table_exists = len(cur.fetchall()) # value used in visualize step
         # create the table (if it doesn't exist)
         cur.execute(create_table_statement)
+        # check to see if anything is in the table for subsequent use
+        cur.execute('SELECT COUNT(*) FROM {};'.format(TABLE_NAME))
+        table_is_empty = cur.fetchone()[0] == 0
+        # check to see what existing base currency is in table
+        cur.execute('SELECT DISTINCT(base) FROM {};'.format(TABLE_NAME))
+        # what is the current base currency in the table?
+        base_currency_in_table = None if table_is_empty else cur.fetchone()[0]
+        base_currency_to_use = args.base if base_currency_in_table is None or args.populate else base_currency_in_table
+        # determine dates in table
+        cur.execute('SELECT MIN(date), MAX(date) FROM {};'.format(TABLE_NAME))
+        if not table_is_empty:
+            min_date_in_table, max_date_in_table = list(map(lambda x: datetime.fromisoformat(x).date(), cur.fetchall()[0]))
+            date_range_in_table = [min_date_in_table + timedelta(days=x) for x in range((max_date_in_table - min_date_in_table).days+1)]
+
 
         # =========================
         # POPULATE/REPOPULATE TABLE
         # =========================
         if args.populate:
-            # truncate table
-            cur.execute('DELETE FROM {};'.format(TABLE_NAME))
-            print("Populating table '{}'...".format(TABLE_NAME))
-            # accumulate all of the data from start date up to and including today
-            for dt in tqdm(date_range):
-                # if not a weekend, then request updated exchange rates
-                if isoweekdays[dt.isoweekday()] not in ['Saturday', 'Sunday']:
-                    response = get_api_response(dt)
-                statement, values = get_insert_statement_and_values(
-                    rsp=response, date=str(dt), table_name=TABLE_NAME, rate_keys=rate_keys, base_rate=args.base)
-                insert_into_table(cur, statement, values)
-            print("Done - table populated from {} to {}.".format(start_date, end_date))
+            if base_currency_to_use == base_currency_in_table:
+                dates_to_pull = list(set(date_range).difference(set(date_range_in_table)))
+            else:
+                # truncate table
+                print('Truncating table...')
+                cur.execute('DELETE FROM {};'.format(TABLE_NAME))
+                dates_to_pull = date_range
+            if not len(dates_to_pull):
+                print('Given dates already exist in table for base currency of {}!'.format(base_currency_to_use))
+            else:
+                print("Populating table '{}'...".format(TABLE_NAME))
+                # accumulate all of the data from start date up to and including today
+                for dt in tqdm(dates_to_pull):
+                    # if not a weekend, then request updated exchange rates
+                    if isoweekdays[dt.isoweekday()] not in ['Saturday', 'Sunday']:
+                        response = get_api_response(dt)
+                    statement, values = get_insert_statement_and_values(
+                        rsp=response, date=str(dt), table_name=TABLE_NAME, rate_keys=rate_keys, base_rate=base_currency_to_use)
+                    insert_into_table(conn, cur, statement, values)
+                print("Done - table populated from {} to {} using base currency of {}.".format(start_date, end_date, base_currency_to_use))
+            conn.commit()
+            min_date_in_table, max_date_in_table = start_date, end_date
 
         # ====================
         # CREATE VISUALIZATION
         # ====================
         if args.visualize:
-            if not table_exists:
-                msg = 'The table "{}" is not populated. Include the -p flag to populate the table before plotting.'.format(TABLE_NAME)
+            if table_is_empty and not args.populate:
+                msg = "The table '{}' is not populated. Include the -p flag to populate the table before plotting.".format(TABLE_NAME)
                 raise Exception(msg)
-            cur.execute('SELECT date FROM {};'.format(TABLE_NAME))
-            dates_in_table = [x[0] for x in cur.fetchall()]
+            if args.base != base_currency_in_table and not args.populate:
+                warn_about_base_currency(behavior='Visualization', arg_base=args.base, table_base=base_currency_in_table)
             # check the provided dates are in the table
-            validate_date(str(start_date), 'start', dates_in_table, TABLE_NAME)
-            validate_date(str(end_date), 'end', dates_in_table, TABLE_NAME)
-            if args.base not in countries:
-                countries.append(args.base)
+            msg = "The {} date '{}' is not in the table '{}'. Include the -p flag to populate the table with the date range."
+            assert start_date >= min_date_in_table, msg.format('start', str(start_date), TABLE_NAME)
+            assert end_date <= max_date_in_table, msg.format('end', str(end_date), TABLE_NAME)
+            # include base currency in countries list
+            if base_currency_to_use not in countries:
+                countries.append(base_currency_to_use)
             select_statement = 'SELECT ' + '{},'*len(countries)
             select_statement = select_statement.rstrip(',').format(*countries) + '\nFROM {}'.format(TABLE_NAME)
-            select_statement += '\nWHERE date IN {};'.format(tuple([str(d) for d in date_range]))
+            select_statement += "\nWHERE date BETWEEN '{}' and '{}';".format(min_date_in_table, max_date_in_table)
             cur.execute(select_statement)
             data = cur.fetchall()
             # isolate rates
             rates = {}
             for index, country in enumerate(countries):
                 rates[country] = [x[index] for x in data]
-            visualize_exchange_rates(rates, args.base, date_range)
+            visualize_exchange_rates(rates, base_currency_to_use, date_range)
 
         # ==================
         # DAILY TABLE UPDATE
@@ -277,19 +305,20 @@ if __name__ == '__main__':
             print('Daily update has begun.\nNote: This update will run indefinitely unless killed.')
             # loop to run indefinitely to gather daily update
             # determine the next day. When it arrives, we need to call the API
-            if table_exists:
+            if not table_is_empty:
+                if args.base != base_currency_in_table and not args.populate:
+                    warn_about_base_currency(behavior='Update', arg_base=args.base, table_base=base_currency_in_table)
                 # get the max date and add one day
-                cur.execute('SELECT MAX(date) FROM {};'.format(TABLE_NAME))
-                query_date = datetime.fromisoformat(cur.fetchone()[0]).date() + timedelta(days=1)
+                query_date = max_date_in_table + timedelta(days=1)
             else:
-                query_date = datetime.now().date()
+                query_date = start_date
             while True:
                 today_date = datetime.now().date()
                 if today_date > query_date:
                     response = get_api_response(query_date)
                     statement, values = get_insert_statement_and_values(
-                        rsp=response, date=str(query_date), table_name=TABLE_NAME, rate_keys=rate_keys, base_rate=args.base)
-                    print('Updating table for {}...'.format(query_date))
-                    insert_into_table(cur, statement, values)
+                        rsp=response, date=str(query_date), table_name=TABLE_NAME, rate_keys=rate_keys, base_rate=base_currency_to_use)
+                    print('Updating table for {} using base currency {}...'.format(query_date, base_currency_to_use))
+                    insert_into_table(conn, cur, statement, values)
                     print('Done - table updated.'.format(query_date))
                     query_date += timedelta(days=1)

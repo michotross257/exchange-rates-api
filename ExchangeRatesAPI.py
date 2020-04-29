@@ -253,6 +253,7 @@ if __name__ == '__main__':
                 # truncate table
                 print('Truncating table...')
                 cur.execute('DELETE FROM {};'.format(TABLE_NAME))
+                conn.commit()
                 dates_to_pull = date_range
             if not len(dates_to_pull):
                 print('Given dates already exist in table for base currency of {}!'.format(base_currency_to_use))
@@ -267,7 +268,6 @@ if __name__ == '__main__':
                         rsp=response, date=str(dt), table_name=TABLE_NAME, rate_keys=rate_keys, base_rate=base_currency_to_use)
                     insert_into_table(conn, cur, statement, values)
                 print("Done - table populated from {} to {} using base currency of {}.".format(start_date, end_date, base_currency_to_use))
-            conn.commit()
             min_date_in_table, max_date_in_table = start_date, end_date
 
         # ====================

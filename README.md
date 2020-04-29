@@ -38,13 +38,13 @@ $ python ExchangeRatesAPI.py -p -b CAD
 ```
 $ python ExchangeRatesAPI.py -p -s 2019-01-01 -e 2019-02-01
 ```
-**Visualize CAD, MXN, BGN against base currency of EUR from 2019-02-01 to Today *without* repopulating the table**
+**Visualize CAD, MXN, BGN against existing base currency in table from 2019-02-01 to today *without* repopulating the table**
 ```
-$ python ExchangeRatesAPI.py -v -b EUR -s 2019-02-01 -c CAD,MXN,BGN
+$ python ExchangeRatesAPI.py -v -s 2019-02-01 -c CAD,MXN,BGN
 ```
 > **NOTE**: If you try to visualize a date that is not in the table without including the `-p` flag, then an exception will be raised.
 
-**Populate the table using default currency (USD) using the default date range (2019-05-01 to today), plot USD vs CAD, then allow the update feature to run indefinitely**
+**Populate the table using default base currency (USD) using the default date range (2019-05-01 to today), plot USD vs CAD, then allow the update feature to run indefinitely**
 ```
 $ python ExchangeRatesAPI.py -p -v -u
 ```

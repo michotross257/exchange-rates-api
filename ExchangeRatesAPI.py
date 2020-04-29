@@ -43,7 +43,7 @@ def extract_dates(start, end):
     start_date = check_date_arg(start)
     end_date = check_date_arg(end)
     # ensure start date < end date
-    msg = 'Start date "{}" must be before the end date "{}".'
+    msg = "Start date '{}' must be before the end date '{}'."
     assert start_date < end_date, msg.format(str(start_date), str(end_date))
 
     return start_date, end_date
@@ -93,11 +93,12 @@ def get_insert_statement_and_values(rsp, date, table_name, rate_keys, base_rate)
     return statement, values
 
 
-def insert_into_table(statement, values):
+def insert_into_table(cursor, statement, values):
     """
     Insert the values into the table.
 
     Args:
+        cursor(sqlite3.connect().cursor()): cursor connected to database
         statement(str): INSERT statement to be committed
         values(tuple): Values to be included in INSERT statement
 
@@ -105,7 +106,7 @@ def insert_into_table(statement, values):
         None
     """
     try:
-        c.execute(statement, values)
+        cursor.execute(statement, values)
     except sqlite3.IntegrityError:
         pass
 
@@ -218,20 +219,20 @@ if __name__ == '__main__':
 
     # create the database and connect to it
     with sqlite3.connect('exchange_rates.db') as conn:
-        c = conn.cursor()
+        cur = conn.cursor()
         # check to see if table exists for plotting in case the user does not choose to repopulate
         # the table but chooses to plot, in which case, raise an exception
-        c.execute('SELECT name FROM sqlite_master WHERE name="{}"'.format(TABLE_NAME))
-        table_exists = len(c.fetchall()) # value used in visualize step
+        cur.execute('SELECT name FROM sqlite_master WHERE name="{}"'.format(TABLE_NAME))
+        table_exists = len(cur.fetchall()) # value used in visualize step
         # create the table (if it doesn't exist)
-        c.execute(create_table_statement)
+        cur.execute(create_table_statement)
 
         # =========================
         # POPULATE/REPOPULATE TABLE
         # =========================
         if args.populate:
             # truncate table
-            c.execute('DELETE FROM {};'.format(TABLE_NAME))
+            cur.execute('DELETE FROM {};'.format(TABLE_NAME))
             print("Populating table '{}'...".format(TABLE_NAME))
             # accumulate all of the data from start date up to and including today
             for dt in tqdm(date_range):
@@ -240,7 +241,7 @@ if __name__ == '__main__':
                     response = get_api_response(dt)
                 statement, values = get_insert_statement_and_values(
                     rsp=response, date=str(dt), table_name=TABLE_NAME, rate_keys=rate_keys, base_rate=args.base)
-                insert_into_table(statement, values)
+                insert_into_table(cur, statement, values)
             print("Done - table populated from {} to {}.".format(start_date, end_date))
 
         # ====================
@@ -250,8 +251,8 @@ if __name__ == '__main__':
             if not table_exists:
                 msg = 'The table "{}" is not populated. Include the -p flag to populate the table before plotting.'.format(TABLE_NAME)
                 raise Exception(msg)
-            c.execute('SELECT date FROM {};'.format(TABLE_NAME))
-            dates_in_table = [x[0] for x in c.fetchall()]
+            cur.execute('SELECT date FROM {};'.format(TABLE_NAME))
+            dates_in_table = [x[0] for x in cur.fetchall()]
             # check the provided dates are in the table
             validate_date(str(start_date), 'start', dates_in_table, TABLE_NAME)
             validate_date(str(end_date), 'end', dates_in_table, TABLE_NAME)
@@ -260,8 +261,8 @@ if __name__ == '__main__':
             select_statement = 'SELECT ' + '{},'*len(countries)
             select_statement = select_statement.rstrip(',').format(*countries) + '\nFROM {}'.format(TABLE_NAME)
             select_statement += '\nWHERE date IN {};'.format(tuple([str(d) for d in date_range]))
-            c.execute(select_statement)
-            data = c.fetchall()
+            cur.execute(select_statement)
+            data = cur.fetchall()
             # isolate rates
             rates = {}
             for index, country in enumerate(countries):
@@ -278,8 +279,8 @@ if __name__ == '__main__':
             # determine the next day. When it arrives, we need to call the API
             if table_exists:
                 # get the max date and add one day
-                c.execute('SELECT MAX(date) FROM {};'.format(TABLE_NAME))
-                query_date = datetime.fromisoformat(c.fetchone()[0]).date() + timedelta(days=1)
+                cur.execute('SELECT MAX(date) FROM {};'.format(TABLE_NAME))
+                query_date = datetime.fromisoformat(cur.fetchone()[0]).date() + timedelta(days=1)
             else:
                 query_date = datetime.now().date()
             while True:
@@ -289,6 +290,6 @@ if __name__ == '__main__':
                     statement, values = get_insert_statement_and_values(
                         rsp=response, date=str(query_date), table_name=TABLE_NAME, rate_keys=rate_keys, base_rate=args.base)
                     print('Updating table for {}...'.format(query_date))
-                    insert_into_table(statement, values)
+                    insert_into_table(cur, statement, values)
                     print('Done - table updated.'.format(query_date))
                     query_date += timedelta(days=1)

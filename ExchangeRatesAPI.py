@@ -43,9 +43,8 @@ def extract_dates(start, end):
     start_date = check_date_arg(start)
     end_date = check_date_arg(end)
     # ensure start date < end date
-    msg = 'Start date "{}" must be before the end date "{}".'.format(start_date.strftime('%Y-%m-%d'),
-                                                                     end_date.strftime('%Y-%m-%d'))
-    assert start_date < end_date, msg
+    msg = 'Start date "{}" must be before the end date "{}".'
+    assert start_date < end_date, msg.format(str(start_date), str(end_date))
 
     return start_date, end_date
 

@@ -248,19 +248,19 @@ if __name__ == '__main__':
         # =========================
         if args.populate:
             if base_currency_to_use == base_currency_in_table:
-                dates_to_pull = list(set(date_range).difference(set(date_range_in_table)))
+                dates_to_query = list(set(date_range).difference(set(date_range_in_table)))
             else:
                 # truncate table
                 print('Truncating table...')
                 cur.execute('DELETE FROM {};'.format(TABLE_NAME))
                 conn.commit()
-                dates_to_pull = date_range
-            if not len(dates_to_pull):
+                dates_to_query = date_range
+            if not len(dates_to_query):
                 print('Given dates already exist in table for base currency of {}!'.format(base_currency_to_use))
             else:
                 print("Populating table '{}'...".format(TABLE_NAME))
                 # accumulate all of the data from start date up to and including today
-                for dt in tqdm(dates_to_pull):
+                for dt in tqdm(dates_to_query):
                     # if not a weekend, then request updated exchange rates
                     if isoweekdays[dt.isoweekday()] not in ['Saturday', 'Sunday']:
                         response = get_api_response(dt)

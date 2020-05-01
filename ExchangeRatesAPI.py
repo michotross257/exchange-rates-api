@@ -93,12 +93,11 @@ def get_insert_statement_and_values(rsp, date, table_name, rate_keys, base_rate)
     return statement, values
 
 
-def insert_into_table(connection, cursor, statement, values):
+def insert_into_table(cursor, statement, values):
     """
-    Insert the values into the table then commit insert.
+    Insert the values into the table.
 
     Args:
-        connection(sqlite3.connect()): connection to database
         cursor(sqlite3.connect().cursor()): cursor connected to database
         statement(str): INSERT statement to be committed
         values(tuple): Values to be included in INSERT statement
@@ -110,7 +109,6 @@ def insert_into_table(connection, cursor, statement, values):
         cursor.execute(statement, values)
     except sqlite3.IntegrityError:
         pass
-    connection.commit()
 
 
 def visualize_exchange_rates(rates, base_rate, dates):
@@ -224,7 +222,8 @@ if __name__ == '__main__':
     create_table_statement += '\n)'
 
     # create the database and connect to it
-    with sqlite3.connect('exchange_rates.db') as conn:
+    # NOTE: isolation_level=None means autocommit mode
+    with sqlite3.connect('exchange_rates.db', isolation_level=None) as conn:
         cur = conn.cursor()
         # create the table (if it doesn't exist)
         cur.execute(create_table_statement)
@@ -253,7 +252,6 @@ if __name__ == '__main__':
                 # truncate table
                 print('Truncating table...')
                 cur.execute('DELETE FROM {};'.format(TABLE_NAME))
-                conn.commit()
                 dates_to_query = date_range
             if not len(dates_to_query):
                 print('Given dates already exist in table for base currency of {}!'.format(base_currency_to_use))
@@ -266,7 +264,7 @@ if __name__ == '__main__':
                         response = get_api_response(dt)
                     statement, values = get_insert_statement_and_values(
                         rsp=response, date=str(dt), table_name=TABLE_NAME, rate_keys=rate_keys, base_rate=base_currency_to_use)
-                    insert_into_table(conn, cur, statement, values)
+                    insert_into_table(cur, statement, values)
                 print("Done - table populated from {} to {} using base currency of {}.".format(start_date, end_date, base_currency_to_use))
             min_date_in_table, max_date_in_table = start_date, end_date
 
@@ -319,6 +317,6 @@ if __name__ == '__main__':
                     statement, values = get_insert_statement_and_values(
                         rsp=response, date=str(query_date), table_name=TABLE_NAME, rate_keys=rate_keys, base_rate=base_currency_to_use)
                     print('Updating table for {} using base currency {}...'.format(query_date, base_currency_to_use))
-                    insert_into_table(conn, cur, statement, values)
+                    insert_into_table(cur, statement, values)
                     print('Done - table updated.'.format(query_date))
                     query_date += timedelta(days=1)
